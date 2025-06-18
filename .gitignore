@@ -1,0 +1,4 @@
+# terraform の秘密ファイル
+terraform.tfvars
+# Terraformのプロバイダープラグイン実行バイナリ(容量大)
+.terraform/
