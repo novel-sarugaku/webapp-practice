@@ -911,6 +911,8 @@ resource "azurerm_storage_container" "uploads" {
 | `storage_account_name = azurerm_storage_account.main.name` | 紐づけるストレージアカウント名 |
 | `container_access_type = "blob"` | 誰でも中のファイル（BLOB）を**URLで閲覧可能**な状態にする設定（ただしファイル一覧は見えない） |
 
+---
+
 ### `outputs.tf` の記載内容確認
 
 `outputs.tf` は、Terraformで作成したリソースの重要な情報を出力するためのファイル
@@ -979,6 +981,7 @@ output "storage_account_primary_blob_endpoint" {
 }
 
 ```
+---
 
 ### `variable.tf` の記載内容確認
 
@@ -1038,11 +1041,15 @@ resource "azurerm_linux_web_app" "backend" {
 }
 ```
 
+---
+
 ### `terraform.tfvars.example` をコピーして `terraform.tfvars` を作成
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 ```
+
+---
 
 ### `terraform.tfvars` の記載内容確認
 
@@ -1064,6 +1071,8 @@ jwt_secret = "◯◯◯◯◯"
 # バックエンドアプリ名（※ variables.tf にデフォルトが定義されているため省略可能）
 # backend_app_name = "webapp-practice-be-dev"
 ```
+
+---
 
 ### `.gitignore` ファイルで `terraform.tfvars` を隠す
 
