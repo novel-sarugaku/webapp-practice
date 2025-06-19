@@ -1099,8 +1099,110 @@ terraform.tfvars
 .terraform/
 ```
 
+---
 
+### Terraform実行
 
+#### 初期化
+
+```bash
+terraform init
+```
+
+- `.terraform/` ディレクトリが作成される  
+- Azure Provider がダウンロードされる  
+- バックエンド設定が初期化される
+
+#### 現在のプラン確認（少し時間かかる）
+
+```bash
+terraform plan
+```
+
+- 実行されるとAzureに作成予定のリソースが確認できる。
+- Azure Provider がダウンロードされる  
+- 作成される Azure のリソースや、その設定内容を確認できる
+- 確認ポイント：作成されるリソース数、各リソースの設定内容、料金の概算
+
+#### terraform plan で確認した「これから起こる変更」を、実際にクラウド上で反映（適用）
+
+```bash
+terraform apply
+```
+
+上記を実行すると、アクションを実行するかを確認されるため、「yes」を入力して実行を承認
+
+#### Azureリソースの状況
+
+##### 作成できたリソース
+- azurerm_resource_group.main（リソースグループ）
+- azurerm_application_insights.main（App Insights）
+- azurerm_mssql_server.main（SQLサーバー）
+- azurerm_mssql_firewall_rule.*（SQLのファイアウォールルール）
+- azurerm_mssql_database.main（SQLデータベース）
+
+##### 作成できなかったリソース
+
+- App Service Plan
+
+###### エラー内容
+
+- `401 Unauthorized`
+  - リクエストされたリソースにアクセスするための認証情報が不足していることを示す。
+
+- `Quota不足`
+  - Quota：Azureなどのクラウドサービスで使えるリソースの上限数（制限）のこと
+  - システムのリソースが、現在利用可能な量を超えている状態を指す。
+
+###### エラーメッセージ箇所
+
+```hcl
+Operation cannot be completed without additional quota.
+Current Limit (Free VMs): 0
+Current Usage: 0
+Amount required for this deployment (Free VMs): 0
+```
+
+###### 原因
+
+- Azure サブスクリプションには「Free VM」枠のリソースが作成できない制限（＝割り当て上限が0）がある。
+  App Service Plan は仮想マシンリソースを消費するため、この制限により作成不可となっている。
+- 401 Unauthorized については、権限不足やアクセス制限が影響している可能性がある。
+
+###### 対処方法
+
+- Azureポータルで「クォータの増加申請」をする（サポート→クォータ→App Service Plan関連）または、App Service Plan の SKU を Free 以外（B1など）に変更して試す。
+- ロールが「所有者（Owner）」であるか確認
+
+###### エラー解消手順
+
+- Azureポータルで権限確認
+  - サブスクリプションレベルのロール確認
+    - Azureポータルにログイン
+    - 左上の「ハンバーガーメニュー」からサブスクリプション を検索してクリック
+    - 使用しているサブスクリプション（例: “Pay-As-You-Go”など）をクリック
+    - 左メニューで「アクセス制御 (IAM)」を選択
+    - 「ロールの割り当て」タブをクリック
+    - 一覧から自分の名前（またはメールアドレス）を探す。自分のアカウントに「所有者 (Owner)」が割り当てられているか確認
+  - リソースグループ単位で確認する場合
+    - 左側メニューから「リソース グループ」を選択
+    - 該当のリソースグループ（例：rg-webapp-dev）をクリック
+    - 左メニューから「アクセス制御 (IAM)」を選択
+    - 「ロールの割り当て」タブで、自分に Owner ロールがあるか確認
+
+- クォータの増加申請（サポートに申請連絡後、数時間〜１日かかる）
+  - 以下URLを参考に申請
+    - 途中で詰まったら従課金制（Basic）にアップデートして、数分待ってから再度同じ手順で進める。
+    - https://learn.microsoft.com/ja-jp/azure/extended-zones/request-quota-increase
+    - Azureで「クォータを増やす」とは？
+      - 使える上限（回数や台数）を引き上げること
+    - なぜこのような対応が必要なのか？
+      - Azureは新規ユーザーや無料枠のサブスクリプションに対して、以下を初期状態で制限している（不正利用・料金爆発を防ぐため）。
+        | リソースの種類                  | 初期クォータ         |
+        |-------------------------------|----------------------|
+        | App Service Plan（B1/S1など） | 0台（作成不可）      |
+        | 仮想マシン（Standard VM）     | 0〜数台              |
+        | Premium Storage など          | 利用制限あり          |
 
 
 
