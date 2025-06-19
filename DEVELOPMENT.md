@@ -1141,7 +1141,7 @@ terraform apply
 - azurerm_mssql_firewall_rule.*（SQLのファイアウォールルール）
 - azurerm_mssql_database.main（SQLデータベース）
 
-##### 作成できなかったリソース
+##### 作成できなかったリソース（1/2）
 
 - App Service Plan
 
@@ -1204,8 +1204,148 @@ Amount required for this deployment (Free VMs): 0
         | 仮想マシン（Standard VM）     | 0〜数台              |
         | Premium Storage など          | 利用制限あり          |
 
+- 修正
+   - main.tf で App Service PlanのSKUを F1（Free）→ B1（Basic）に変更
+   - 現在、 Azure 側で Free (F1) プランのクォータが 0 のため、デプロイできない。そのため、比較的安価な B1 プラン（有料）に変更
+   ```hcl
+    # ==============================================================================
+    # ローカル変数
+    # ==============================================================================
+
+    locals {
+      environment = "dev"
+        project     = "webapp"
+        location    = "Japan East"
+    
+      common_tags = {
+        Environment = local.environment
+        Project     = local.project
+        Owner       = "DevTeam"
+        CreatedBy   = "Terraform"
+    }
+
+      # 開発環境用の設定
+      config = {
+        app_service_sku = "B1"  # ← F1 から B1 に変更
+        sql_sku        = "Basic"
+        backup_enabled = false
+      }
+    }
+   ```
+
+##### 作成できなかったリソース（2/2）
+
+- Storage Account
+
+###### エラー内容
+
+- `409 Conflict`
+  - クライアントからのリクエストがサーバー上の現在の状態と競合しているため、処理できないことを示す。このエラーは、主にリソースの同時更新や競合が発生した場合に返される。
+
+###### エラーメッセージ箇所
+
+```hcl
+StorageAccountAlreadyTaken: The storage account named stwebappdev is already taken.
+```
+
+###### 原因
+
+- ストレージアカウントはAzure全体で一意である必要があるが、すでに他ユーザーか別サブスクリプションでstwebappdev という名前のが使われている。
+
+###### 対処方法
+
+- ストレージアカウント名をユニークなものに変更する。
+
+###### エラー解消手順
+
+- 修正
+  - main.tf で Storage Account名を変更（以下の部分追加）
+
+  ```hcl
+    # ==============================================================================
+    # 開発環境用 Terraform 設定
+    # ==============================================================================
+
+    terraform {
+      required_providers {
+        random = {                      # ← randomブロック追加
+          source  = "hashicorp/random"
+          version = "~> 3.0"
+        }
+        azurerm = {
+          source  = "hashicorp/azurerm"
+          version = "~> 3.0"
+        }
+      }
+      required_version = ">= 1.0"
+    }
+
+
+    provider "azurerm" {
+      features {
+        key_vault {
+          purge_soft_delete_on_destroy    = true
+          recover_soft_deleted_key_vaults = true
+        }
+      }
+    }
+  ```
+
+  ```hcl
+    # ==============================================================================
+    # ローカル変数
+    # ==============================================================================
+
+    locals {
+      environment = "dev"
+      project     = "webapp"
+      location    = "Japan East"
+    
+      common_tags = {
+        Environment = local.environment
+        Project     = local.project
+        Owner       = "DevTeam"
+        CreatedBy   = "Terraform"
+      }
+
+      # 開発環境用の設定
+      config = {
+        app_service_sku = "B1"  # ← F1 から B1 に変更
+        sql_sku        = "Basic"
+        backup_enabled = false
+      }
+    }
+
+    resource "random_string" "storage_suffix" {  # ← resourceブロック追加
+      length  = 4
+      pper   = false
+      special = false
+    }
+  ```
+
+  ```hcl
+    # ==============================================================================
+    # Storage Account
+    # ==============================================================================
+
+    resource "azurerm_storage_account" "main" {
+      name                     = "st${local.project}${local.environment}${random_string.storage_suffix.result}"  # ${random_string.storage_suffix.result}"追加
+      resource_group_name      = azurerm_resource_group.main.name
+      location                 = azurerm_resource_group.main.location
+      account_tier             = "Standard"
+      account_replication_type = "LRS"  # 開発環境はローカル冗長で十分
+      tags                    = local.common_tags
+    
+    以下省略
+  ```
+
+  - 上記「エラー解消手順」後以下を実行
+    - terraform init
+    - terraform plan で差分確認
+    - terraform apply で再デプロイ
 
 
 
 ---
+
 ※記載途中
