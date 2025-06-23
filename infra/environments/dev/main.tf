@@ -3,20 +3,28 @@
 # ==============================================================================
 
 terraform {
-  required_version = ">= 1.0"
   required_providers {
+    random = {                      # ← randomブロック追加
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~>3.0"
+      version = "~> 3.0"
     }
   }
+  required_version = ">= 1.0"
 }
+
 
 provider "azurerm" {
   features {
     key_vault {
       purge_soft_delete_on_destroy    = true
       recover_soft_deleted_key_vaults = true
+    }
+    resource_group {
+      prevent_deletion_if_contains_resources = false
     }
   }
 }
@@ -39,10 +47,16 @@ locals {
 
   # 開発環境用の設定
   config = {
-    app_service_sku = "F1"  # 無料プラン
+    app_service_sku = "F1"  # 無料プラン（クォータ制限回避）
     sql_sku        = "Basic"
     backup_enabled = false
   }
+}
+
+resource "random_string" "storage_suffix" {  # ← resourceブロック追加
+  length  = 4
+  upper   = false
+  special = false
 }
 
 # ==============================================================================
@@ -198,7 +212,7 @@ resource "azurerm_application_insights" "main" {
 # ==============================================================================
 
 resource "azurerm_storage_account" "main" {
-  name                     = "st${local.project}${local.environment}"  # 小文字のみ、24文字以内
+  name                     = "st${local.project}${local.environment}${random_string.storage_suffix.result}"  # ${random_string.storage_suffix.result}"追加
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
